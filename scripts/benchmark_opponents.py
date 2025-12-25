@@ -11,7 +11,9 @@ import argparse
 import logging
 import io
 import os
+from pathlib import Path
 from contextlib import contextmanager, redirect_stdout
+sys.path.append(str(Path(__file__).resolve().parent.parent))  # for crib_ai_trainer imports
 
 # Fix encoding issues on Windows
 if sys.platform == 'win32':
@@ -21,7 +23,6 @@ if sys.platform == 'win32':
 from crib_ai_trainer.Arena import Arena
 import numpy as np
 from pathlib import Path
-from models.Myrmidon import Myrmidon
 from models.Perceptron import Perceptron
 
 logger = logging.getLogger(__name__)

@@ -2,6 +2,7 @@
 """
 Train AI models, save artifacts locally under ./trained_models as _new, then copy them into
 crib_back/models. Previous _new becomes _old if it exists.
+python .\scripts\train_and_export.py --models=simpleperceptron --iterations=5
 """
 
 import shutil
@@ -14,25 +15,29 @@ import io
 import random
 from contextlib import contextmanager, redirect_stdout
 
+sys.path.append(str(Path(__file__).resolve().parent.parent))  # for crib_ai_trainer imports
+
 # Cribbage imports
 from crib_ai_trainer.Arena import Arena
 
 # Player imports (refactored into models package)
-from models.Myrmidon import Myrmidon
 from models.Perceptron import Perceptron
 from models.SimpleFrequency import SimpleFrequency
+from models.SimplePerceptron import SimplePerceptron
 from models.TableQ import TableQ
 from models.RuleBased import RuleBased
 
+
 # Training configuration
-TRAINING_ROUNDS = 5000  # hands to play per iteration
+TRAINING_ROUNDS = 1000  # hands to play per iteration
 TRAINING_ITERATIONS = 1  # 0 = infinite, >0 = specific number of iterations
-BENCHMARK_GAMES = 1000  # games to compare candidate vs old before publishing
+BENCHMARK_GAMES = 5000  # games to compare candidate vs old before publishing
 SEED = None  # set to an int for determinism, or leave None
 UPDATE_BEST = "--do-not-update-best" not in sys.argv
 GENERATE_REPORT = "--no-report" not in sys.argv
+MODELS_TO_TRAIN = ["simplefrequency", "tableq", "perceptron", "rulebased"]  # default: train all
 
-# CLI overrides: --seed=INT, --benchmark-games=INT, --iterations=INT
+# CLI overrides: --seed=INT, --benchmark-games=INT, --iterations=INT, --models=model1,model2
 for arg in sys.argv:
     if arg.startswith("--seed="):
         try:
@@ -47,6 +52,12 @@ for arg in sys.argv:
     if arg.startswith("--iterations="):
         try:
             TRAINING_ITERATIONS = int(arg.split("=", 1)[1])
+        except Exception:
+            pass
+    if arg.startswith("--models="):
+        try:
+            models_str = arg.split("=", 1)[1]
+            MODELS_TO_TRAIN = [m.strip().lower() for m in models_str.split(",")]
         except Exception:
             pass
 
@@ -85,7 +96,7 @@ def suppress_stdout():
 def get_best_opponent(player_number: int):
     """Determine the best available opponent for training.
     
-    Checks for a best_opponent.txt file. If not found, defaults to Myrmidon.
+    Checks for a best_opponent.txt file. If not found, defaults to Perceptron.
     Returns an opponent player instance.
     """
     best_opponent_file = local_models / "best_opponent.txt"
@@ -121,9 +132,13 @@ def get_best_opponent(player_number: int):
                 return opponent
 
     
-    # Default to Myrmidon
-    print(f"Training against Myrmidon (baseline)")
-    return Myrmidon(number=player_number, numSims=10, verboseFlag=False)
+    # Default to Perceptron
+    print(f"Training against Perceptron (baseline)")
+    perc = Perceptron(number=player_number, alpha=0.1, verboseFlag=False)
+    if perc_throw_weights_old.exists() and perc_peg_weights_old.exists():
+        perc.throwingWeights = np.load(perc_throw_weights_old)
+        perc.peggingWeights = np.load(perc_peg_weights_old)
+    return perc
 
 def archive_and_save(new_path: Path, old_path: Path, data, save_fn):
     """Archive existing _new to _old, then save new data as _new."""
@@ -184,6 +199,7 @@ def generate_model_report(games: int = BENCHMARK_GAMES):
     # Build candidate loaders that prefer _new else _old
     def load_perceptron(player_number: int):
         p = Perceptron(number=player_number, alpha=0.1, verboseFlag=False)
+        p.name = "Perceptron"
         p.throwingWeights = np.load(prefer_new_else_old(perc_throw_weights_new, perc_throw_weights_old))
         p.peggingWeights = np.load(prefer_new_else_old(perc_peg_weights_new, perc_peg_weights_old))
         return p
@@ -206,13 +222,16 @@ def generate_model_report(games: int = BENCHMARK_GAMES):
         p.load_weights(path)
         return p
 
+    def load_rulebased(player_number: int):
+        return RuleBased(number=player_number, aggressive=True, verboseFlag=False)
+
     loaders = []
     # Attempt to include each model if artifacts exist
     for name, loader in [
         ("Perceptron", load_perceptron),
         ("SimpleFrequency", load_simple_frequency),
         ("TableQ", load_tableq),
-        ("Myrmidon", lambda n: Myrmidon(number=n, numSims=10, verboseFlag=False))
+        ("RuleBased", load_rulebased)
     ]:
         try:
             # quick instantiation to verify availability
@@ -316,7 +335,7 @@ def update_best_opponent_ladder(games: int = BENCHMARK_GAMES):
     """Run ladder benchmark and update best_opponent.txt if any candidate beats current best."""
     print("\nUpdating best opponent via ladder benchmark...")
     best_file = local_models / "best_opponent.txt"
-    current_best = "Myrmidon"
+    current_best = "Perceptron"
     try:
         if best_file.exists():
             current_best = best_file.read_text(encoding="utf-8").strip() or current_best
@@ -324,8 +343,6 @@ def update_best_opponent_ladder(games: int = BENCHMARK_GAMES):
         pass
 
     def loader_for_name(name, player_number):
-        if name == "Myrmidon":
-            return Myrmidon(number=player_number, numSims=10, verboseFlag=False)
         if name == "Perceptron":
             p = Perceptron(number=player_number, alpha=0.1, verboseFlag=False)
             p.throwingWeights = np.load(prefer_new_else_old(perc_throw_weights_new, perc_throw_weights_old))
@@ -347,10 +364,12 @@ def update_best_opponent_ladder(games: int = BENCHMARK_GAMES):
             p = TableQ(number=player_number, alpha=0.1, gamma=0.9, epsilon=0.1, verboseFlag=False)
             p.load_weights(path)
             return p
+        if name == "RuleBased":
+            return RuleBased(number=player_number, aggressive=True, verboseFlag=False)
         raise ValueError(name)
 
     # Build candidate list (available models)
-    candidates = ["Perceptron", "SimpleFrequency", "TableQ", "Myrmidon"]
+    candidates = ["Perceptron", "SimpleFrequency", "TableQ", "RuleBased"]
     available = []
     for name in candidates:
         try:
@@ -406,6 +425,7 @@ perc_peg_weights_old = perc_dir / "peg_weights_old.npy"
 
 continuing_perc = perc_throw_weights_old.exists() and perc_peg_weights_old.exists()
 perceptron = Perceptron(number=1, alpha=0.1, verboseFlag=False)
+perceptron.name = "Perceptron"
 if continuing_perc:
     perceptron.throwingWeights = np.load(perc_throw_weights_old)
     perceptron.peggingWeights = np.load(perc_peg_weights_old)
@@ -462,6 +482,33 @@ def load_tq_old(player_number: int):
         raise FileNotFoundError("TableQ _old weights unreadable")
     return p
 
+# RuleBased setup
+rulebased = RuleBased(number=1, aggressive=True, verboseFlag=False)
+
+def load_rb_old(player_number: int):
+    return RuleBased(number=player_number, aggressive=True, verboseFlag=False)
+
+# SimplePerceptron setup
+sp_dir = ensure_dir(local_models / "simple_perceptron")
+sp_throw_weights_new = sp_dir / "throw_weights_new.npy"
+sp_throw_weights_old = sp_dir / "throw_weights_old.npy"
+sp_peg_weights_new = sp_dir / "peg_weights_new.npy"
+sp_peg_weights_old = sp_dir / "peg_weights_old.npy"
+
+continuing_sp = sp_throw_weights_old.exists() and sp_peg_weights_old.exists()
+simple_perceptron = SimplePerceptron(number=1, alpha=0.1, verboseFlag=False)
+if continuing_sp:
+    simple_perceptron.throwingWeights = np.load(sp_throw_weights_old)
+    simple_perceptron.peggingWeights = np.load(sp_peg_weights_old)
+
+def load_sp_old(player_number: int):
+    if not (sp_throw_weights_old.exists() and sp_peg_weights_old.exists()):
+        raise FileNotFoundError("SimplePerceptron _old weights not found")
+    p = SimplePerceptron(number=player_number, alpha=0.1, verboseFlag=False)
+    p.throwingWeights = np.load(sp_throw_weights_old)
+    p.peggingWeights = np.load(sp_peg_weights_old)
+    return p
+
 def save_simple_frequency(model_obj, path):
     model_obj.save_weights(path)
 
@@ -478,47 +525,77 @@ try:
         print(f"{'=' * 80}")
         
         # Train SimpleFrequency
-        print(f"\n[1/3] SimpleFrequency Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
-        opponent = get_best_opponent(2)
-        arena = Arena([simple_frequency, opponent], repeatDeck=False, verboseFlag=False)
-        with suppress_stdout():
-            results = arena.playHands(TRAINING_ROUNDS)
-        avg_diff = np.mean(results[2])
-        print(f"  Complete. Avg diff: {avg_diff:.2f}")
-        if run_benchmark(simple_frequency, load_sf_old, BENCHMARK_GAMES):
-            archive_and_save(sf_weights_new, sf_weights_old, simple_frequency, save_tableq if False else save_simple_frequency)
-            print(f"  ✓ Published SimpleFrequency")
-        else:
-            print(f"  ✗ SimpleFrequency did not beat _old; continuing")
+        if "simplefrequency" in MODELS_TO_TRAIN:
+            print(f"\n[1/5] SimpleFrequency Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
+            opponent = get_best_opponent(2)
+            arena = Arena([simple_frequency, opponent], repeatDeck=False, verboseFlag=False)
+            with suppress_stdout():
+                results = arena.playHands(TRAINING_ROUNDS)
+            avg_diff = np.mean(results[2])
+            print(f"  Complete. Avg diff: {avg_diff:.2f}")
+            if run_benchmark(simple_frequency, load_sf_old, BENCHMARK_GAMES):
+                archive_and_save(sf_weights_new, sf_weights_old, simple_frequency, save_tableq if False else save_simple_frequency)
+                print(f"  ✓ Published SimpleFrequency")
+            else:
+                print(f"  ✗ SimpleFrequency did not beat _old; continuing")
 
         # Train TableQ
-        print(f"\n[2/3] TableQ Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
-        opponent = get_best_opponent(2)
-        arena = Arena([tableq, opponent], repeatDeck=False, verboseFlag=False)
-        with suppress_stdout():
-            results = arena.playHands(TRAINING_ROUNDS)
-        avg_diff = np.mean(results[2])
-        print(f"  Complete. Avg diff: {avg_diff:.2f}")
-        if run_benchmark(tableq, load_tq_old, BENCHMARK_GAMES):
-            archive_and_save(tq_weights_new, tq_weights_old, tableq, save_tableq)
-            print(f"  ✓ Published TableQ")
-        else:
-            print(f"  ✗ TableQ did not beat _old; continuing")
+        if "tableq" in MODELS_TO_TRAIN:
+            print(f"\n[2/5] TableQ Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
+            opponent = get_best_opponent(2)
+            arena = Arena([tableq, opponent], repeatDeck=False, verboseFlag=False)
+            with suppress_stdout():
+                results = arena.playHands(TRAINING_ROUNDS)
+            avg_diff = np.mean(results[2])
+            print(f"  Complete. Avg diff: {avg_diff:.2f}")
+            if run_benchmark(tableq, load_tq_old, BENCHMARK_GAMES):
+                archive_and_save(tq_weights_new, tq_weights_old, tableq, save_tableq)
+                print(f"  ✓ Published TableQ")
+            else:
+                print(f"  ✗ TableQ did not beat _old; continuing")
 
         # Train Perceptron
-        print(f"\n[3/3] Perceptron Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
-        opponent = get_best_opponent(2)
-        arena = Arena([perceptron, opponent], repeatDeck=False, verboseFlag=False)
-        with suppress_stdout():
-            results = arena.playHands(TRAINING_ROUNDS)
-        avg_diff = np.mean(results[2])
-        print(f"  Complete. Avg diff: {avg_diff:.2f}")
-        if run_benchmark(perceptron, load_perc_old, BENCHMARK_GAMES):
-            archive_and_save(perc_throw_weights_new, perc_throw_weights_old, perceptron.throwingWeights, np.save)
-            archive_and_save(perc_peg_weights_new, perc_peg_weights_old, perceptron.peggingWeights, np.save)
-            print(f"  ✓ Published Perceptron")
-        else:
-            print(f"  ✗ Perceptron did not beat _old; continuing")
+        if "perceptron" in MODELS_TO_TRAIN:
+            print(f"\n[3/5] Perceptron Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
+            opponent = get_best_opponent(2)
+            arena = Arena([perceptron, opponent], repeatDeck=False, verboseFlag=False)
+            with suppress_stdout():
+                results = arena.playHands(TRAINING_ROUNDS)
+            avg_diff = np.mean(results[2])
+            print(f"  Complete. Avg diff: {avg_diff:.2f}")
+            if run_benchmark(perceptron, load_perc_old, BENCHMARK_GAMES):
+                archive_and_save(perc_throw_weights_new, perc_throw_weights_old, perceptron.throwingWeights, np.save)
+                archive_and_save(perc_peg_weights_new, perc_peg_weights_old, perceptron.peggingWeights, np.save)
+                print(f"  ✓ Published Perceptron")
+            else:
+                print(f"  ✗ Perceptron did not beat _old; continuing")
+
+        # Train RuleBased
+        if "rulebased" in MODELS_TO_TRAIN:
+            print(f"\n[4/5] RuleBased Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
+            opponent = get_best_opponent(2)
+            arena = Arena([rulebased, opponent], repeatDeck=False, verboseFlag=False)
+            with suppress_stdout():
+                results = arena.playHands(TRAINING_ROUNDS)
+            avg_diff = np.mean(results[2])
+            print(f"  Complete. Avg diff: {avg_diff:.2f}")
+            print(f"  ✓ RuleBased trained (note: RuleBased is deterministic; no weights to publish)")
+
+        # Train SimplePerceptron
+        if "simpleperceptron" in MODELS_TO_TRAIN:
+            print(f"\n[5/5] SimplePerceptron Iteration {iteration}: Training for {TRAINING_ROUNDS} hands...")
+            opponent = get_best_opponent(2)
+            arena = Arena([simple_perceptron, opponent], repeatDeck=False, verboseFlag=False)
+            with suppress_stdout():
+                results = arena.playHands(TRAINING_ROUNDS)
+            avg_diff = np.mean(results[2])
+            print(f"  Complete. Avg diff: {avg_diff:.2f}")
+            if run_benchmark(simple_perceptron, load_sp_old, BENCHMARK_GAMES):
+                archive_and_save(sp_throw_weights_new, sp_throw_weights_old, simple_perceptron.throwingWeights, np.save)
+                archive_and_save(sp_peg_weights_new, sp_peg_weights_old, simple_perceptron.peggingWeights, np.save)
+                print(f"  ✓ Published SimplePerceptron")
+            else:
+                print(f"  ✗ SimplePerceptron did not beat _old; continuing")
 
 except KeyboardInterrupt:
     print(f"\n\n⚠ Training interrupted at iteration {iteration}. Saving current state...")

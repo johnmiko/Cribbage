@@ -35,6 +35,7 @@ class Perceptron(Player):
         # For tracking state during learning
         self.lastState = None
         self.lastAction = None
+        self.name = "Perceptron"
 
     def getThrowCards(self):
         """

@@ -1,6 +1,8 @@
 # Cribbage
 This project contains the code for Cribbage as a reinforcement learning problem.
 
+Note: The agents LinearB, NonLinearB, DeepPeg, and Myrmidon have been deleted since they have consistently underperformed
+
 ## To get right into it
 The agents are: Myrmidon.py, Monty.py, Monty2.py, Perceptron.py, and PlayerRandom.py
 
