@@ -278,7 +278,7 @@ class NonLinearB(Player):
         self.throwingWeights = self.throwingWeights + (
                     self.stepSize * (reward - np.matmul(self.throwingWeights, state)) * state)
 
-        np.save('./NLBthrowWeights.npy', self.throwingWeights)
+        # np.save('./NLBthrowWeights.npy', self.throwingWeights)  # Disabled: managed by train_and_export
 
     # True Online Sarsa(lambda) from Sutton and Barto, p. 307
     def learnFromPegging(self, gameState):
@@ -317,7 +317,7 @@ class NonLinearB(Player):
             # Bookkeeping to prepare for the next step
             self.qOld = qPrime
 
-            np.save("./NLBpegWeights.npy", self.peggingWeights)
+            # np.save("./NLBpegWeights.npy", self.peggingWeights)  # Disabled: managed by train_and_export
 
 if __name__ == '__main__':
     # Initialize variables

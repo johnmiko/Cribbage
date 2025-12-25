@@ -1,0 +1,15 @@
+{
+  "linear_b": {
+    "throw_weights": "throw_weights_new.npy",
+    "peg_weights": "peg_weights_new.npy",
+    "nlb_throw_weights": "nlb_throw_weights_new.npy",
+    "nlb_peg_weights": "nlb_peg_weights_new.npy"
+  },
+  "deep_peg": {
+    "pegging_brain": "pegging_brain_new.pkl",
+    "throwing_brain": "throwing_brain_new.pkl"
+  },
+  "myrmidon": {
+    "config": "config.txt"
+  }
+}

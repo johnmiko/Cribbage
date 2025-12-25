@@ -1,0 +1,96 @@
+{
+  "games": 700,
+  "pairs": [
+    {
+      "a": "LinearB",
+      "b": "NonLinearB",
+      "a_wins": 354,
+      "b_wins": 300,
+      "ties": 46,
+      "avg_diff": 0.41285714285714287
+    },
+    {
+      "a": "LinearB",
+      "b": "Myrmidon",
+      "a_wins": 145,
+      "b_wins": 521,
+      "ties": 34,
+      "avg_diff": -5.761428571428572
+    },
+    {
+      "a": "NonLinearB",
+      "b": "Myrmidon",
+      "a_wins": 103,
+      "b_wins": 565,
+      "ties": 32,
+      "avg_diff": -6.521428571428571
+    }
+  ],
+  "totals": {
+    "LinearB": {
+      "wins": 499,
+      "losses": 821,
+      "ties": 80,
+      "point_diff": -3744.0,
+      "win_pct": 37.803030303030305
+    },
+    "NonLinearB": {
+      "wins": 403,
+      "losses": 919,
+      "ties": 78,
+      "point_diff": -4854.0,
+      "win_pct": 30.484114977307108
+    },
+    "Myrmidon": {
+      "wins": 1086,
+      "losses": 248,
+      "ties": 66,
+      "point_diff": 8598.0,
+      "win_pct": 81.40929535232384
+    }
+  },
+  "ranking": [
+    {
+      "name": "Myrmidon",
+      "win_pct": 81.40929535232384,
+      "point_diff": 8598.0,
+      "wins": 1086,
+      "losses": 248,
+      "ties": 66
+    },
+    {
+      "name": "LinearB",
+      "win_pct": 37.803030303030305,
+      "point_diff": -3744.0,
+      "wins": 499,
+      "losses": 821,
+      "ties": 80
+    },
+    {
+      "name": "NonLinearB",
+      "win_pct": 30.484114977307108,
+      "point_diff": -4854.0,
+      "wins": 403,
+      "losses": 919,
+      "ties": 78
+    }
+  ],
+  "deprioritize": [
+    {
+      "name": "LinearB",
+      "win_pct": 37.803030303030305,
+      "point_diff": -3744.0,
+      "wins": 499,
+      "losses": 821,
+      "ties": 80
+    },
+    {
+      "name": "NonLinearB",
+      "win_pct": 30.484114977307108,
+      "point_diff": -4854.0,
+      "wins": 403,
+      "losses": 919,
+      "ties": 78
+    }
+  ]
+}

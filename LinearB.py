@@ -250,7 +250,7 @@ class LinearB(Player):
         self.throwingWeights = self.throwingWeights + (
                 self.stepSize * (reward - np.matmul(self.throwingWeights, state)) * state)
 
-        np.save('./throwWeights.npy', self.throwingWeights)
+        # np.save('./throwWeights.npy', self.throwingWeights)  # Disabled: managed by train_and_export
 
     # True Online Sarsa(lambda) from Sutton and Barto, p. 307
     def learnFromPegging(self, gameState):
@@ -289,7 +289,7 @@ class LinearB(Player):
             # Bookkeeping to prepare for the next step
             self.qOld = qPrime
 
-            np.save("./pegWeights.npy", self.peggingWeights)
+            # np.save("./pegWeights.npy", self.peggingWeights)  # Disabled: managed by train_and_export
 
 if __name__ == '__main__':
     # Initialize variables

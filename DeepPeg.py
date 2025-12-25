@@ -52,6 +52,7 @@ from Utilities import cardsString,softmax
 import numpy as np
 import sklearn as skl
 from sklearn import neural_network as sknn
+from sklearn.exceptions import NotFittedError
 import random
 import os
 import joblib
@@ -91,7 +92,7 @@ class DeepPeg(Player):
         else:
             self.peggingBrain = sknn.MLPRegressor(hidden_layer_sizes=(50, 50, 50, 25, 25, 25, 15), activation='relu', solver='adam',
                                                   alpha=0.1,
-                                                  batch_size=1, max_iter=500)
+                                                  batch_size=1, max_iter=2000)
             print("New Pegging Brain created")
 
         filename = 'Qlearn_throwV1.brain'
@@ -103,7 +104,7 @@ class DeepPeg(Player):
         else:
             self.throwingBrain = sknn.MLPRegressor(hidden_layer_sizes=(25, 20, 15, 10, 10), activation='relu', solver='adam',
                                                    alpha=0.1,
-                                                   batch_size=1, max_iter=500)
+                                                   batch_size=1, max_iter=2000)
             print("New Throwing Brain created")
 
         filename = 'cardCombinations.json'
@@ -452,9 +453,9 @@ class DeepPeg(Player):
         actionValues = [[0, 0, 0, 0, 0]]
         try:
             actionValues = self.peggingBrain.predict(np.array([state]))
-        except skl.exceptions.NotFittedError:
+        except NotFittedError:
             # If the brain hasn't seen any training data yet, will return the NotFittedError.
-            print("DeepPeg {}'s SAValues function had an skl.exceptions.NotFittedError".format(self.number))
+            print("DeepPeg {}'s SAValues function had a NotFittedError".format(self.number))
         finally:
             return actionValues[0]
 
@@ -482,8 +483,8 @@ class DeepPeg(Player):
         value = 0
         try:
             value = self.throwingBrain.predict(np.array([state]))
-        except skl.exceptions.NotFittedError:
-            print("DeepPeg {}'s throwValue function had an skl.exceptions.NotFittedError".format(self.number))
+        except NotFittedError:
+            print("DeepPeg {}'s throwValue function had a NotFittedError".format(self.number))
         finally:
             return value
 
